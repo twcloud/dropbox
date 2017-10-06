@@ -3,6 +3,7 @@
 /// <reference path="./Rx.min.d.ts" />
 var wrapper;
 (function (wrapper) {
+    var SCRIPT_CACHE = "201710052";
     //PARANOIA: Delete the window property of these libraries to prevent 
     //Javascript in the page from messing with them.
     var Rx = window.Rx;
@@ -301,7 +302,7 @@ var wrapper;
             //allow-same-origin 
             $(document.body).html("<iframe id=\"twits-iframe\" sandbox=\"allow-same-origin allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-scripts\"></iframe>");
             this.iframe = $('#twits-iframe')[0];
-            var inject = "<script src=\"" + (location.origin + location.pathname.slice(0, location.pathname.lastIndexOf('/'))) + "/tiddly-saver-inject.js\"></script>";
+            var inject = "<script src=\"" + (location.origin + location.pathname.slice(0, location.pathname.lastIndexOf('/'))) + "/tiddly-saver-inject.js?" + SCRIPT_CACHE + "\"></script>";
             this.iframe.src = URL.createObjectURL(new Blob([blob, inject], { type: 'text/html' }));
             this.iframe.addEventListener('load', function (ev) {
                 var handle = setInterval(function () {

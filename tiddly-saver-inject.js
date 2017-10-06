@@ -11,7 +11,7 @@ Child: save-file-tiddly-saver
 
 (function(){
 	//set tiddlywiki classic to readonly
-	if(config && config.options) config.options.chkHttpReadOnly = false;
+	if(typeof config !== "undefined" && config && config.options) config.options.chkHttpReadOnly = false;
 	var injectedSaveFile = function (path, content) {
 		console.log('injectedSaveFile', path, getLocalPath(location.href) === path)
 		if(getLocalPath(location.href) !== path) return false;

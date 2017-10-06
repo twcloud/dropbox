@@ -12,6 +12,7 @@ interface Window {
 type rxjs = typeof Rx;
 type Hashmap<T> = { [K: string]: T };
 namespace wrapper {
+	const SCRIPT_CACHE = "201710052";
 	//PARANOIA: Delete the window property of these libraries to prevent 
 	//Javascript in the page from messing with them.
 	const Rx: rxjs = window.Rx;
@@ -344,7 +345,7 @@ namespace wrapper {
 			this.iframe = $('#twits-iframe')[0];
 			const inject = `<script src="${
 				location.origin + location.pathname.slice(0, location.pathname.lastIndexOf('/'))
-				}/tiddly-saver-inject.js"></script>`
+				}/tiddly-saver-inject.js?${SCRIPT_CACHE}"></script>`
 			this.iframe.src = URL.createObjectURL(new Blob([blob, inject], { type: 'text/html' }));
 			this.iframe.addEventListener('load', (ev) => {
 				const handle = setInterval(() => {
