@@ -72,11 +72,15 @@ namespace wrapper {
 			}
 
 			if (!this.token.access_token) {
-				location.href = this.client.getAuthenticationUrl(location.href);
+				if(preload) sessionStorage.setItem('twcloud-dropbox-path', preload);
+				else sessionStorage.setItem('twcloud-dropbox-path', '');
+				location.href = this.client.getAuthenticationUrl(location.origin + location.pathname + "?type=" + type);
 				return;
 			} else {
 				this.client.setAccessToken(this.token.access_token);
 			}
+			if(!preload) preload = sessionStorage.getItem('twcloud-dropbox-path');
+			sessionStorage.setItem('twcloud-dropbox-path', '');
 			this.initApp(preload);
 		}
 
