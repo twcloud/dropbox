@@ -1,23 +1,13 @@
 "use strict";
 /// <reference path="./dropbox.min.d.ts" />
-/// <reference path="./Rx.min.d.ts" />
 var wrapper;
 (function (wrapper) {
     var SCRIPT_CACHE = "201710052";
-    //PARANOIA: Delete the window property of these libraries to prevent 
-    //Javascript in the page from messing with them.
-    var Rx = window.Rx;
-    delete window.Rx;
-    var Dropbox = window.Dropbox;
-    delete window.Dropbox;
-    var $ = window.jQuery;
-    delete window.$;
-    delete window.jQuery;
-    //load classes from Rx
-    var Observable = Rx.Observable, Subject = Rx.Subject, Subscriber = Rx.Subscriber, Subscription = Rx.Subscription;
     var twits = /** @class */ (function () {
         function twits(type, preload) {
             var _this = this;
+            this.type = type;
+            this.preload = preload;
             this.targetOrigin = "*";
             this.apiKeyFull = "gy3j4gsa191p31x";
             this.apiKeyApps = "tu8jc7jsdeg55ta";
@@ -25,7 +15,7 @@ var wrapper;
             if (type !== "apps" && type !== "full")
                 throw "type must be either apps or full";
             this.client = new Dropbox({
-                clientId: (type === "full" ? this.apiKeyFull : (type === "apps" ? this.apiKeyApps : ""))
+                clientId: this.getKey()
             });
             // Authenticate against Dropbox
             this.setStatusMessage("Authenticating with Dropbox...");
@@ -55,6 +45,9 @@ var wrapper;
             sessionStorage.setItem('twcloud-dropbox-path', '');
             this.initApp(preload);
         }
+        twits.prototype.getKey = function () {
+            return (this.type === "full" ? this.apiKeyFull : (this.type === "apps" ? this.apiKeyApps : ""));
+        };
         // Main application
         twits.prototype.initApp = function (preload) {
             var _this = this;
@@ -98,21 +91,17 @@ var wrapper;
             }
             return size.toFixed(1) + TAGS[power];
         };
-        twits.prototype.streamFilesListFolder = function (path) {
-            var output = new Subject();
+        twits.prototype.streamFilesListFolder = function (path, handler) {
             function resHandler(res) {
-                output.next(res.entries);
+                handler(res.entries, !!res.has_more);
                 if (res.has_more)
                     return this.client.filesListFolderContinue({
                         cursor: res.cursor
                     }).then(resHandler);
-                else
-                    output.complete();
             }
             this.client.filesListFolder({
                 path: path
             }).then(resHandler);
-            return output.asObservable();
         };
         twits.prototype.readFolder = function (path, parentNode) {
             var _this = this;
@@ -124,10 +113,11 @@ var wrapper;
             listParent.appendChild(loadingMessage);
             parentNode.appendChild(listParent);
             var filelist = [];
-            this.streamFilesListFolder(path).subscribe(function (stats) {
+            this.streamFilesListFolder(path, function (stats, has_more) {
                 filelist.push.apply(filelist, stats);
                 loadingMessage.innerText = "Loading " + filelist.length + "...";
-            }, function (x) { return console.error(x); }, function () {
+                if (has_more)
+                    return;
                 loadingMessage.remove();
                 filelist.sort(function (a, b) {
                     //order by isFolder DESC, name ASC
@@ -296,24 +286,94 @@ var wrapper;
             this.setProgress("");
         };
         ;
-        twits.prototype.loadTiddlywiki = function (data, blob) {
+        twits.prototype.requestScript = function (url) {
+            return new Promise(function (resolve) {
+                var oReq = new XMLHttpRequest();
+                oReq.open("GET", url, true);
+                oReq.responseType = "text";
+                oReq.onload = function (oEvent) {
+                    //var blob = new Blob([oReq.response], {type: "image/png"});
+                    resolve(oReq.response);
+                };
+                oReq.send();
+            });
+        };
+        twits.prototype.buildNewBlob = function (originalBlob, originalText) {
             var _this = this;
+            var startIndex = originalText.indexOf('<html');
+            var htmlheader = (startIndex === -1) ? "<" + "!DOCTYPE html>" : originalText.slice(0, startIndex);
+            var modHeader = '(function(module){ var exports = module.exports;';
+            var modFooter = '; return module.exports; })({ exports: {} });';
+            var lines = [
+                htmlheader,
+                '<' + 'script>(function(){',
+            ];
+            this.requestScript('dropbox.min.js').then(function (res) {
+                lines.push("const Dropbox = " + modHeader + res + modFooter);
+                return _this.requestScript('twcloud.js?' + SCRIPT_CACHE);
+            }).then(function (res) {
+                lines.push(res);
+                lines.push('})();');
+                return _this.requestScript('tiddly-saver-inject.js?' + SCRIPT_CACHE);
+            }).then(function (res) {
+                lines.push(res);
+                lines.push('<' + '/script>');
+                // const trailer = '<' + 'script>if(typeof config !== "undefined" && config && config.options) config.options.chkHttpReadOnly = false;<' + '/script>';
+                var blob = new Blob([lines.join('\n\n'), originalBlob], { type: 'text/html' });
+                var url = URL.createObjectURL(blob);
+                delete _this.client;
+                sessionStorage.setItem('twcloud-dropbox-twits', JSON.stringify(_this));
+                location.href = url;
+            });
+        };
+        twits.prototype.loadTiddlywiki = function (data, blob) {
             var self = this;
             //allow-same-origin 
-            $(document.body).html("<iframe id=\"twits-iframe\" sandbox=\"allow-same-origin allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-scripts\"></iframe>");
-            this.iframe = $('#twits-iframe')[0];
-            var inject = "<script src=\"" + (location.origin + location.pathname.slice(0, location.pathname.lastIndexOf('/'))) + "/tiddly-saver-inject.js?" + SCRIPT_CACHE + "\"></script>";
-            this.iframe.src = URL.createObjectURL(new Blob([blob, inject], { type: 'text/html' }));
-            this.iframe.addEventListener('load', function (ev) {
-                var handle = setInterval(function () {
-                    if (_this.messageSaverReady)
-                        clearInterval(handle);
-                    else
-                        _this.iframe.contentWindow.postMessage({ message: 'welcome-tiddly-saver' }, _this.targetOrigin);
-                }, 1000);
-            });
-            window.addEventListener('message', this.onmessage.bind(this));
+            document.body.innerHTML = "<iframe id=\"twits-iframe\" sandbox=\"allow-same-origin allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-scripts\"></iframe>";
+            this.iframe = document.getElementById('twits-iframe');
+            this.buildNewBlob(blob, data);
             return true;
+            // const inject = `<script src="${
+            // 	location.origin + location.pathname.slice(0, location.pathname.lastIndexOf('/'))
+            // 	}/tiddly-saver-inject.js?${SCRIPT_CACHE}"><` + `/script>`;
+            // this.iframe.src = URL.createObjectURL(new Blob([blob, inject], { type: 'text/html' }));
+            // this.iframe.addEventListener('load', (ev) => {
+            // });
+            // window.addEventListener('message', this.onmessage.bind(this));
+            // return true;
+        };
+        twits.prototype.setupSaving = function () {
+            var _this = this;
+            // const handle = setInterval(() => {
+            // 	if (this.messageSaverReady) clearInterval(handle);
+            // 	else this.iframe.contentWindow.postMessage({ message: 'welcome-tiddly-saver' }, this.targetOrigin);
+            // }, 1000)
+            // window.addEventListener('message', this.onmessage.bind(this));
+            console.log('inserting message box');
+            var messageBox = document.getElementById("tiddlyfox-message-box");
+            if (!messageBox) {
+                messageBox = document.createElement("div");
+                messageBox.id = "tiddlyfox-message-box";
+                messageBox.style.display = "none";
+                document.body.appendChild(messageBox);
+            }
+            // Attach the event handler to the message box
+            messageBox.addEventListener("tiddlyfox-save-file", function (ev) {
+                // Get the details from the message
+                var messageElement = event.target, path = messageElement.getAttribute("data-tiddlyfox-path"), content = messageElement.getAttribute("data-tiddlyfox-content"), backupPath = messageElement.getAttribute("data-tiddlyfox-backup-path");
+                // messageId = "tiddlywiki-save-file-response-" + this.idGenerator++;
+                if (path !== document.location.toString())
+                    return;
+                _this.saveTiddlyWiki(content, function (err) {
+                    // Send a confirmation message
+                    var event = document.createEvent("Events");
+                    event.initEvent("tiddlyfox-have-saved-file", true, false);
+                    event.savedFilePath = path;
+                    messageElement.dispatchEvent(event);
+                });
+                // Remove the message element from the message box
+                messageElement.parentNode.removeChild(messageElement);
+            }, false);
         };
         twits.prototype.onmessage = function (event) {
             var _this = this;
@@ -355,14 +415,27 @@ var wrapper;
         };
         return twits;
     }());
-    // Do our stuff when the page has loaded
-    document.addEventListener("DOMContentLoaded", function (event) {
-        var url = new URL(location.href);
-        var accessType = url.searchParams.get('type');
-        var preload = url.searchParams.get('path');
-        if (!accessType)
-            return;
-        $('#twits-selector').hide();
-        new twits(accessType, preload && decodeURIComponent(preload));
-    }, false);
+    // only load if we are on http or https, otherwise we are probably in a blob
+    if (location.protocol.indexOf('http') === 0)
+        document.addEventListener("DOMContentLoaded", function (event) {
+            var url = new URL(location.href);
+            var accessType = url.searchParams.get('type');
+            var preload = url.searchParams.get('path');
+            if (!accessType)
+                return;
+            document.getElementById('twits-selector').style.display = "none";
+            new twits(accessType, preload && decodeURIComponent(preload));
+        }, false);
+    else if (location.protocol === "blob:")
+        document.addEventListener("DOMContentLoaded", function (event) {
+            var sessionstr = sessionStorage.getItem('twcloud-dropbox-twits');
+            if (!sessionstr)
+                return alert('The session could not be loaded');
+            var session = Object.assign(Object.create(twits.prototype), JSON.parse(sessionstr));
+            session.client = new Dropbox({
+                clientId: session.getKey(),
+                accessToken: session.token.access_token
+            });
+            session.setupSaving();
+        }, false);
 })(wrapper || (wrapper = {}));

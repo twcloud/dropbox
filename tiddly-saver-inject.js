@@ -7,23 +7,25 @@ Child: save-file-tiddly-saver
     Parent: file-saved-tiddly-saver
 	
 */
+window.tweakConfig = () => {
+	config.options.chkHttpReadOnly = false;
+}
 
+window.addEventListener('load', function () {
 
-(function(){
 	//set tiddlywiki classic to readonly
-	if(typeof config !== "undefined" && config && config.options) config.options.chkHttpReadOnly = false;
+	// if(typeof config !== "undefined" && config && config.options) config.options.chkHttpReadOnly = false;
 	var injectedSaveFile = function (path, content) {
 		console.log('injectedSaveFile', path, getLocalPath(location.href) === path)
-		if(getLocalPath(location.href) !== path) return false;
+		if (getLocalPath(location.href) !== path) return false;
 		return saver(content, "save", function () {
 			(displayMessage || alert)(config.messages.mainSaved || "File saved");
 		});
-
 	};
 	var injectedLoadFile = function (path) {
 		try {
 			console.log('injectedLoadFile', path, getLocalPath(location.href) === path);
-			if(getLocalPath(location.href) !== path) return false;
+			if (getLocalPath(location.href) !== path) return false;
 			return window.originalHTML;
 		} catch (ex) {
 			return false;
@@ -51,60 +53,28 @@ Child: save-file-tiddly-saver
 	var isTW5 = false;
 	var isTWC = false;
 	var thankyouSent = false;
-	var pendingSaves = {};
-	var messageId = 1;
-	window.addEventListener('message', function (event) {
-		console.log(event, this);
-		if (event.data.message === "welcome-tiddly-saver") {
-			window.postToParent = event.source.postMessage.bind(event.source);
-			window.parentOrigin = event.origin;
-			window.postToParent({ 
-				message: 'thankyou-tiddly-saver', 
-				isTWC: isTWC, 
-				isTW5: isTW5 
-			}, event.origin);
-			thankyouSent = true;
-		} else if (event.data.message === "file-saved-tiddly-saver") {
-			pendingSaves[event.data.id](event.data.error);
-			delete pendingSaves[event.data.id];
-		} else if (event.data.message === "original-html-tiddly-saver") {
-			window.originalHTML = event.data.originalText;
-		}
-	});
-
-	console.log('inserting message box');
-	var messageBox = document.getElementById("tiddlyfox-message-box");
-	if (!messageBox) {
-		messageBox = document.createElement("div");
-		messageBox.id = "tiddlyfox-message-box";
-		messageBox.style.display = "none";
-		document.body.appendChild(messageBox);
-	}
-	// Attach the event handler to the message box
-	messageBox.addEventListener("tiddlyfox-save-file", (ev) => {
-		// Get the details from the message
-		var messageElement = event.target,
-			path = messageElement.getAttribute("data-tiddlyfox-path"),
-			content = messageElement.getAttribute("data-tiddlyfox-content"),
-			backupPath = messageElement.getAttribute("data-tiddlyfox-backup-path"),
-			messageId = "tiddlywiki-save-file-response-" + this.idGenerator++;
-
-		// Remove the message element from the message box
-		messageElement.parentNode.removeChild(messageElement);
-	}, false);
-
 
 	var saver = function (text, method, callback, options) {
+		var messageBox = document.getElementById("tiddlyfox-message-box");
+		if (messageBox) {
 
-		if (window.postToParent) {
-			window.postToParent({ message: 'save-file-tiddly-saver', data: text, id: messageId }, window.parentOrigin);
-			pendingSaves[messageId] = callback;
-			messageId++;
+			// Create the message element and put it in the message box
+			var message = document.createElement("div");
+			message.setAttribute("data-tiddlyfox-path", document.location.toString());
+			message.setAttribute("data-tiddlyfox-content", text);
+			messageBox.appendChild(message);
+			// Add an event handler for when the file has been saved
+			message.addEventListener("tiddlyfox-have-saved-file", function (event) {
+				callback(null);
+			}, false);
+			// Create and dispatch the custom event to the extension
+			var event = document.createEvent("Events");
+			event.initEvent("tiddlyfox-save-file", true, false);
+			message.dispatchEvent(event);
 			return true;
 		} else {
 			return false;
 		}
-
 	};
 	var saverObj = {
 		info: {
@@ -118,8 +88,8 @@ Child: save-file-tiddly-saver
 		if ($tw.saverHandler && $tw.saverHandler.savers) {
 			$tw.saverHandler.savers.push(saverObj);
 			isTW5 = true;
-			if (thankyouSent)
-				window.postToParent({ message: 'update-tiddly-saver', TW5SaverAdded: true }, window.parentOrigin);
+			// if (thankyouSent)
+			// 	window.postToParent({ message: 'update-tiddly-saver', TW5SaverAdded: true }, window.parentOrigin);
 		} else {
 			setTimeout(addSaver, 1000);
 		}
@@ -127,12 +97,10 @@ Child: save-file-tiddly-saver
 	if (typeof ($tw) !== "undefined" && $tw)
 		addSaver();
 
-	if(version.title === "TiddlyWiki" && version.major === 2){
+	if (version.title === "TiddlyWiki" && version.major === 2) {
 		isTWC = true;
 	}
 
 	console.log("send-welcome-tiddly-chrome-file-saver");
 
-
-
-})();
+});

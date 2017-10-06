@@ -52,6 +52,7 @@
     "strict": false                            /* Enable all strict type-checking options. */
   },
   "files": [
-    "./twcloud.ts"
+    "./twcloud.ts",
+    "./tiddly-saver-inject-2.ts"
   ]
 }
