@@ -7,11 +7,12 @@ Child: save-file-tiddly-saver
     Parent: file-saved-tiddly-saver
 	
 */
-(function () {
 
 
+(function(){
+	config.options.chkHttpReadOnly = false;
 	var injectedSaveFile = function (path, content) {
-		console.log('injectedSaveFile', path, )
+		console.log('injectedSaveFile', path, getLocalPath(location.href) === path)
 		if(getLocalPath(location.href) !== path) return false;
 		return saver(content, "save", function () {
 			(displayMessage || alert)(config.messages.mainSaved || "File saved");
@@ -20,7 +21,7 @@ Child: save-file-tiddly-saver
 	};
 	var injectedLoadFile = function (path) {
 		try {
-			console.log('injectedLoadFile', path);
+			console.log('injectedLoadFile', path, getLocalPath(location.href) === path);
 			if(getLocalPath(location.href) !== path) return false;
 			return window.originalHTML;
 		} catch (ex) {
