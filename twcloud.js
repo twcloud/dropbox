@@ -292,7 +292,7 @@ var wrapper;
             var _this = this;
             var self = this;
             //allow-same-origin 
-            $(document.body).html("<iframe id=\"twits-iframe\" sandbox=\"allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-scripts\"></iframe>");
+            $(document.body).html("<iframe id=\"twits-iframe\" sandbox=\"allow-same-origin allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-scripts\"></iframe>");
             this.iframe = $('#twits-iframe')[0];
             var inject = "<script src=\"" + (location.origin + location.pathname.slice(0, location.pathname.lastIndexOf('/'))) + "/tiddly-saver-inject.js\"></script>";
             this.iframe.src = URL.createObjectURL(new Blob([blob, inject], { type: 'text/html' }));
