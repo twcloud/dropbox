@@ -10,7 +10,7 @@
 	<link rel="icon" href="favicon.ico" type="image/x-icon" />
 	<link rel="shortcut icon" href="favicon.ico" type="image/x-icon" />
 	<script src="twcloud.js?201710052"></script>
-	<style type="text/css">
+	<style type="text/css" id="twits-saver-styles">
 		/* These styles are in the head and so will survive when the parasite TiddlyWiki is loaded */
 
 		#twits-status {
@@ -228,7 +228,11 @@
 			This app enables you to directly edit TiddlyWiki files stored in your Dropbox. It runs entirely in your browser so your data
 			is never uploaded anywhere except directly to your Dropbox account. **
 		</p>
-		<p>Latest: Beta support for TiddlyWiki Classic!</p>
+		<dl style="text-align: left;">
+			<dt><strong>Changes</strong></dt>
+			<dd>Beta support for TiddlyWiki Classic!</dd>
+			<dd>Prepends the saver code to the selected file and uses a blob url to load the actual file</dd>
+		</dl>
 		<div id="twits-selector">
 			<a class="access-full button" href="?type=full">Full Dropbox Access</a>
 			<a class="access-apps button" href="?type=apps">Apps Folder Access</a>

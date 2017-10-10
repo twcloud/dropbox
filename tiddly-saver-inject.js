@@ -101,6 +101,7 @@ window.addEventListener('load', function () {
 		isTWC = true;
 	}
 
-	console.log("send-welcome-tiddly-chrome-file-saver");
+	// console.log("send-welcome-tiddly-chrome-file-saver");
 
 });
+

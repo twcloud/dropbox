@@ -17,6 +17,7 @@ type Hashmap<T> = { [K: string]: T };
 namespace wrapper {
 	const SESSION_KEY = 'twcloud-dropbox-session';
 	const ORIGINAL_KEY = 'twcloud-dropbox-original';
+	const SCRIPT_KEY = 'twcloud-dropbox-script';
 	const SCRIPT_CACHE = "201710052";
 	//PARANOIA: Delete the window property of these libraries to prevent 
 	//Javascript in the page from messing with them. We don't need to do
@@ -73,7 +74,7 @@ namespace wrapper {
 			this.client = new Dropbox({
 				clientId: this.getKey()
 			});
-
+			this.status = new StatusHandler("");
 			// Authenticate against Dropbox
 			this.status.setStatusMessage("Authenticating with Dropbox...");
 
@@ -316,34 +317,46 @@ namespace wrapper {
 			// const { blob, metadata, path, text } = data;
 			const startIndex = data.text.indexOf('<html');
 			const htmlheader = (startIndex === -1) ? "<" + "!DOCTYPE html>" : data.text.slice(0, startIndex);
-			const modHeader = '(function(module){ var exports = module.exports;';
-			const modFooter = '; return module.exports; })({ exports: {} });';
 
-			const scriptparts: (string | Blob | ArrayBuffer)[] = [
+			const scriptparts: (string)[] = [
 				'(function(){ \n',
 			]
-			this.requestScript('dropbox.min.js', "blob").then(res => {
+			this.requestScript('dropbox.min.js', "text").then(res => {
 				scriptparts.push("const Dropbox = (function(module){ var exports = module.exports; \n");
 				scriptparts.push(res);
 				scriptparts.push('\n; return module.exports; })({ exports: {} }); \n');
-				return this.requestScript('twcloud.js?' + SCRIPT_CACHE, "blob")
+				return this.requestScript('twcloud.js?' + SCRIPT_CACHE, "text")
 			}).then(res => {
 				scriptparts.push(res);
 				scriptparts.push('\n })(); \n');
-				return this.requestScript('tiddly-saver-inject.js?' + SCRIPT_CACHE, "blob");
+				return this.requestScript('tiddly-saver-inject.js?' + SCRIPT_CACHE, "text");
 			}).then(res => {
 				scriptparts.push(res);
-				const scriptblob = new Blob(scriptparts, { type: 'application/javascript' });
+				// const scriptblob = new Blob(scriptparts, { type: 'application/javascript' });
+				// const scripturl = URL.createObjectURL(scriptblob);
+				// console.log(scripturl)
+				const css = document.getElementById('twits-saver-styles').innerHTML
 
 				const htmlparts = [
 					htmlheader,
-					'\n<' + 'script src="' + URL.createObjectURL(scriptblob) + '"></' + 'script>\n',
+					'<style>' + css + '</style>',
+					// '\n<' + 'script src="' + scripturl + '"></' + 'script>\n',
+					'\n<' + 'script>' + `
+(function(){
+	const SCRIPT_KEY = '${SCRIPT_KEY}';
+	const scriptStr = sessionStorage.getItem(SCRIPT_KEY);
+	sessionStorage.setItem(SCRIPT_KEY, '');
+	const scriptTag = document.createElement('script');
+	scriptTag.src = URL.createObjectURL(new Blob([scriptStr], {type: "application/javascript"}));
+	document.head.append(scriptTag);
+})();
+` + '</' + 'script>\n',
 					data.blob
 				];
 
 				const blob = new Blob(htmlparts, { type: 'text/html' });
 				const url = URL.createObjectURL(blob);
-
+				// console.log(url);
 				const session: SessionData = {
 					token: this.token,
 					type: this.type,
@@ -352,18 +365,22 @@ namespace wrapper {
 					profilepic: this.user.profile_photo_url
 				};
 
+
 				sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
 				sessionStorage.setItem(ORIGINAL_KEY, data.text);
+				sessionStorage.setItem(SCRIPT_KEY, scriptparts.join('\n'));
 				location.href = url;
+
+
 			})
 		}
 
 		loadTiddlywiki(data: DropboxTiddlyWiki) {
 			const self = this;
-			//allow-same-origin 
-			document.body.innerHTML = `<iframe id="twits-iframe" sandbox="allow-same-origin allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-scripts"></iframe>`;
-			this.iframe = document.getElementById('twits-iframe') as HTMLIFrameElement;
 			this.buildNewBlob(data);
+			//allow-same-origin 
+			// document.body.innerHTML = `<iframe id="twits-iframe" sandbox="allow-same-origin allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-scripts"></iframe>`;
+			// this.iframe = document.getElementById('twits-iframe') as HTMLIFrameElement;
 			return true;
 		}
 
@@ -373,14 +390,17 @@ namespace wrapper {
 	class StatusHandler {
 
 		constructor(private profilepic: string) {
-			// this.getStatusPanel();
+			//initialize the status panel
+			this.clearStatusMessage();
 		}
-
+		// private statusPanelCache: any;
 		private getStatusPanel() {
+			// if(this.statusPanelCache) return this.statusPanelCache;
 			// debugger;
 			var getElement = function (id, parentNode) {
 				parentNode = parentNode || document;
 				var el = document.getElementById(id);
+				
 				if (!el) {
 					el = document.createElement("div");
 					el.setAttribute("id", id);
@@ -392,13 +412,14 @@ namespace wrapper {
 				message = getElement("twits-message", status),
 				progress = getElement("twits-progress", status);
 			status.style.display = "block";
-			if (this.profilepic) {
+			if (this.profilepic && status.getElementsByClassName('profile-pic').length === 0) {
 				const profile = document.createElement('img');
 				profile.src = this.profilepic;
 				profile.classList.add("profile-pic");
 				status.insertBefore(profile, message);
 			}
 			return { status: status, message: message, progress: progress };
+			// return this.statusPanelCache;
 		}
 
 		clearStatusMessage() {
@@ -450,6 +471,7 @@ namespace wrapper {
 				clientId: this.getKey(),
 				accessToken: this.token.access_token
 			})
+			this.setupSaving();
 		}
 
 		setupSaving() {
@@ -522,7 +544,7 @@ namespace wrapper {
 
 	}
 	// only load if we are on http or https, otherwise we are probably in a blob
-	if (location.protocol.indexOf('http') === 0)
+	if (location.protocol.indexOf('http') === 0) {
 		document.addEventListener("DOMContentLoaded", function (event) {
 			const url = new URL(location.href);
 			const accessType = url.searchParams.get('type');
@@ -531,14 +553,15 @@ namespace wrapper {
 			document.getElementById('twits-selector').style.display = "none";
 			new TwitsLoader(accessType, preload && decodeURIComponent(preload));
 		}, false);
-	else if (location.protocol === "blob:")
+	} else if (location.protocol === "blob:") {
+		const sessionStr = sessionStorage.getItem(SESSION_KEY);
+		sessionStorage.setItem(SESSION_KEY, '');
+		const originalHTML = sessionStorage.getItem(ORIGINAL_KEY);
+		sessionStorage.setItem(ORIGINAL_KEY, '');
 		document.addEventListener("DOMContentLoaded", function (event) {
-			const sessionStr = sessionStorage.getItem(SESSION_KEY);
-			sessionStorage.setItem(SESSION_KEY, '');
-			const originalHTML = sessionStorage.getItem(ORIGINAL_KEY);
-			sessionStorage.setItem(ORIGINAL_KEY, '');
 			if (!sessionStr) return alert('The session could not be loaded');
 			const sessiondata = JSON.parse(sessionStr);
 			new SaverHandler(sessiondata, originalHTML);
 		}, false);
+	}
 }
