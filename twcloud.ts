@@ -19,7 +19,7 @@ namespace wrapper {
 	const ORIGINAL_KEY = 'twcloud-dropbox-original';
 	const SCRIPT_KEY = 'twcloud-dropbox-script';
 	const PRELOAD_KEY = 'twcloud-dropbox-preload';
-	const SCRIPT_CACHE = "201710131";
+	const SCRIPT_CACHE = "201710141";
 	//PARANOIA: Delete the window property of these libraries to prevent 
 	//Javascript in the page from messing with them. We don't need to do
 	//this in the blob saver because nothing is loaded into the original
@@ -98,6 +98,7 @@ namespace wrapper {
 					data.forEach(e => {
 						this.token[e[0]] = e[1];
 					});
+					//this is a token and we don't want tiddlywiki to see it
 					preload.hash = "";
 				}
 			}
@@ -582,7 +583,7 @@ namespace wrapper {
 				type: decodeURIComponent(url.searchParams.get('type') || ''),
 				path: decodeURIComponent(url.searchParams.get('path') || ''),
 				user: decodeURIComponent(url.searchParams.get('user') || ''),
-				hash: locationHash
+				hash: locationHash || ''
 			}
 			if (!accessType) return;
 			document.getElementById('twits-selector').style.display = "none";

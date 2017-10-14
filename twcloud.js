@@ -6,7 +6,7 @@ var wrapper;
     var ORIGINAL_KEY = 'twcloud-dropbox-original';
     var SCRIPT_KEY = 'twcloud-dropbox-script';
     var PRELOAD_KEY = 'twcloud-dropbox-preload';
-    var SCRIPT_CACHE = "201710131";
+    var SCRIPT_CACHE = "201710141";
     function tryParseJSON(str) {
         try {
             return JSON.parse(str);
@@ -37,6 +37,7 @@ var wrapper;
                     data.forEach(function (e) {
                         _this.token[e[0]] = e[1];
                     });
+                    //this is a token and we don't want tiddlywiki to see it
                     preload.hash = "";
                 }
             }
@@ -476,7 +477,7 @@ var wrapper;
                 type: decodeURIComponent(url.searchParams.get('type') || ''),
                 path: decodeURIComponent(url.searchParams.get('path') || ''),
                 user: decodeURIComponent(url.searchParams.get('user') || ''),
-                hash: locationHash_1
+                hash: locationHash_1 || ''
             };
             if (!accessType)
                 return;
