@@ -174,12 +174,15 @@ var wrapper;
                     img.style.height = "16px";
                     link.appendChild(img);
                     link.appendChild(document.createTextNode(stat.name));
+                    var size;
                     if (_this.isFileMetadata(stat) && _this.getHumanSize(stat.size)) {
-                        var size = document.createElement("span");
+                        size = document.createElement("span");
                         size.appendChild(document.createTextNode(" (" + _this.getHumanSize(stat.size) + ")"));
-                        link.appendChild(size);
+                        //link.appendChild(size);
                     }
                     listItem.appendChild(link);
+                    if (size)
+                        listItem.appendChild(size);
                     listParent.appendChild(listItem);
                 }
             });

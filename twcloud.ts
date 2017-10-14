@@ -118,9 +118,10 @@ namespace wrapper {
 			this.client.usersGetCurrentAccount(undefined).then(res => {
 				this.user = res;
 				if (preload.user
-					&& (this.user.account_id !== preload.user 
+					&& (this.user.account_id !== preload.user
 					|| this.token.account_id !== preload.user
-					|| this.type !== preload.type)) {
+					|| this.type !== preload.type)
+				) {
 					//allow the user to specify a link that is tied to a dropbox account
 					//also all permalinks specify the dropbox account id
 					alert('You are logged into a different dropbox account than the one specified in this link');
@@ -233,12 +234,14 @@ namespace wrapper {
 					img.style.height = "16px";
 					link.appendChild(img);
 					link.appendChild(document.createTextNode(stat.name));
+					var size
 					if (this.isFileMetadata(stat) && this.getHumanSize(stat.size)) {
-						var size = document.createElement("span");
+						size = document.createElement("span");
 						size.appendChild(document.createTextNode(" (" + this.getHumanSize(stat.size) + ")"));
-						link.appendChild(size);
+						//link.appendChild(size);
 					}
 					listItem.appendChild(link);
+					if (size) listItem.appendChild(size);
 					listParent.appendChild(listItem);
 				}
 			});
