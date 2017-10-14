@@ -6,6 +6,14 @@ var wrapper;
     var ORIGINAL_KEY = 'twcloud-dropbox-original';
     var SCRIPT_KEY = 'twcloud-dropbox-script';
     var SCRIPT_CACHE = "201710052";
+    function tryParseJSON(str) {
+        try {
+            return JSON.parse(str);
+        }
+        catch (e) {
+            return;
+        }
+    }
     var TwitsLoader = /** @class */ (function () {
         function TwitsLoader(type, preload) {
             var _this = this;
@@ -32,18 +40,16 @@ var wrapper;
                     location.hash = "";
             }
             if (!this.token.access_token) {
-                if (preload)
-                    sessionStorage.setItem('twcloud-dropbox-path', preload);
+                if (preload.path)
+                    sessionStorage.setItem('twcloud-dropbox-path', JSON.stringify(preload));
                 else
                     sessionStorage.setItem('twcloud-dropbox-path', '');
                 location.href = this.client.getAuthenticationUrl(location.origin + location.pathname + "?type=" + type);
                 return;
             }
-            else {
-                this.client.setAccessToken(this.token.access_token);
-            }
-            if (!preload)
-                preload = sessionStorage.getItem('twcloud-dropbox-path');
+            if (!preload.path && !preload.user)
+                preload = tryParseJSON(sessionStorage.getItem('twcloud-dropbox-path')) || { type: type };
+            this.client.setAccessToken(this.token.access_token);
             sessionStorage.setItem('twcloud-dropbox-path', '');
             this.initApp(preload);
         }
@@ -56,6 +62,16 @@ var wrapper;
             this.status.clearStatusMessage();
             this.client.usersGetCurrentAccount(undefined).then(function (res) {
                 _this.user = res;
+                if (preload.user
+                    && (_this.user.account_id !== preload.user
+                        || _this.token.account_id !== preload.user
+                        || _this.type !== preload.type)) {
+                    //allow the user to specify a link that is tied to a dropbox account
+                    //also all permalinks specify the dropbox account id
+                    alert('You are logged into a different dropbox account than the one specified in this link');
+                    delete preload.user;
+                    delete preload.path;
+                }
                 var profile = document.getElementById("twits-profile");
                 var pic = document.createElement('img');
                 pic.src = _this.user.profile_photo_url;
@@ -68,8 +84,8 @@ var wrapper;
                 textdata.classList.add(_this.user.team ? "profile-name-team" : "profile-name");
                 profile.appendChild(textdata);
                 profile.classList.remove("startup");
-                if (preload)
-                    _this.openFile(preload);
+                if (preload.path)
+                    _this.openFile(preload.path);
                 else
                     _this.readFolder("", document.getElementById("twits-files"));
             });
@@ -143,7 +159,8 @@ var wrapper;
                     if (_this.isFolderMetadata(stat) || (_this.isFileMetadata(stat) && _this.isHtmlFile(stat))) {
                         link = document.createElement("a");
                         link.href = location.origin + location.pathname + location.search
-                            + "&path=" + encodeURIComponent(stat.path_lower) + location.hash;
+                            + "&path=" + encodeURIComponent(stat.path_lower)
+                            + "&user=" + encodeURIComponent(_this.user.account_id) + location.hash;
                         link.setAttribute("data-twits-path", stat.path_lower);
                         link.addEventListener("click", _this.onClickFolderEntry(), false);
                     }
@@ -446,11 +463,15 @@ var wrapper;
         document.addEventListener("DOMContentLoaded", function (event) {
             var url = new URL(location.href);
             var accessType = url.searchParams.get('type');
-            var preload = url.searchParams.get('path');
+            var preload = {
+                type: decodeURIComponent(url.searchParams.get('type') || ''),
+                path: decodeURIComponent(url.searchParams.get('path') || ''),
+                user: decodeURIComponent(url.searchParams.get('user') || ''),
+            };
             if (!accessType)
                 return;
             document.getElementById('twits-selector').style.display = "none";
-            new TwitsLoader(accessType, preload && decodeURIComponent(preload));
+            new TwitsLoader(accessType, preload);
         }, false);
     }
     else if (location.protocol === "blob:") {

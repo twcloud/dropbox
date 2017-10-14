@@ -52,6 +52,14 @@ namespace wrapper {
 		profilepic: string;
 	}
 
+	function tryParseJSON(str: string) {
+		try {
+			return JSON.parse(str);
+		} catch (e) {
+			return;
+		}
+	}
+
 	class TwitsLoader {
 		iframe: HTMLIFrameElement;
 		user: DropboxTypes.users.FullAccount;
@@ -69,7 +77,10 @@ namespace wrapper {
 		getKey() {
 			return (this.type === "full" ? this.apiKeyFull : (this.type === "apps" ? this.apiKeyApps : ""))
 		}
-		constructor(public type: string, preload: string) {
+		constructor(
+			public type: string,
+			preload: {[K in "type" | "path" | "user"]: string}
+		) {
 			if (type !== "apps" && type !== "full") throw "type must be either apps or full"
 			this.client = new Dropbox({
 				clientId: this.getKey()
@@ -89,23 +100,33 @@ namespace wrapper {
 			}
 
 			if (!this.token.access_token) {
-				if (preload) sessionStorage.setItem('twcloud-dropbox-path', preload);
+				if (preload.path) sessionStorage.setItem('twcloud-dropbox-path', JSON.stringify(preload));
 				else sessionStorage.setItem('twcloud-dropbox-path', '');
 				location.href = this.client.getAuthenticationUrl(location.origin + location.pathname + "?type=" + type);
 				return;
-			} else {
-				this.client.setAccessToken(this.token.access_token);
 			}
-			if (!preload) preload = sessionStorage.getItem('twcloud-dropbox-path');
+
+			if (!preload.path && !preload.user) preload = tryParseJSON(sessionStorage.getItem('twcloud-dropbox-path')) || { type };
+			this.client.setAccessToken(this.token.access_token);
 			sessionStorage.setItem('twcloud-dropbox-path', '');
 			this.initApp(preload);
 		}
 
 		// Main application
-		initApp(preload: string) {
+		initApp(preload: {[K in "type" | "path" | "user"]: string}) {
 			this.status.clearStatusMessage();
 			this.client.usersGetCurrentAccount(undefined).then(res => {
 				this.user = res;
+				if (preload.user
+					&& (this.user.account_id !== preload.user 
+					|| this.token.account_id !== preload.user
+					|| this.type !== preload.type)) {
+					//allow the user to specify a link that is tied to a dropbox account
+					//also all permalinks specify the dropbox account id
+					alert('You are logged into a different dropbox account than the one specified in this link');
+					delete preload.user;
+					delete preload.path;
+				}
 				const profile = document.getElementById("twits-profile");
 				const pic = document.createElement('img');
 				pic.src = this.user.profile_photo_url;
@@ -118,7 +139,7 @@ namespace wrapper {
 				textdata.classList.add(this.user.team ? "profile-name-team" : "profile-name");
 				profile.appendChild(textdata);
 				profile.classList.remove("startup");
-				if (preload) this.openFile(preload);
+				if (preload.path) this.openFile(preload.path);
 				else this.readFolder("", document.getElementById("twits-files"));
 			})
 		};
@@ -198,7 +219,8 @@ namespace wrapper {
 					if (this.isFolderMetadata(stat) || (this.isFileMetadata(stat) && this.isHtmlFile(stat))) {
 						link = document.createElement("a");
 						link.href = location.origin + location.pathname + location.search
-							+ "&path=" + encodeURIComponent(stat.path_lower) + location.hash;
+							+ "&path=" + encodeURIComponent(stat.path_lower)
+							+ "&user=" + encodeURIComponent(this.user.account_id) + location.hash;
 						link.setAttribute("data-twits-path", stat.path_lower);
 						link.addEventListener("click", this.onClickFolderEntry(), false);
 					} else {
@@ -400,7 +422,7 @@ namespace wrapper {
 			var getElement = function (id, parentNode) {
 				parentNode = parentNode || document;
 				var el = document.getElementById(id);
-				
+
 				if (!el) {
 					el = document.createElement("div");
 					el.setAttribute("id", id);
@@ -548,10 +570,14 @@ namespace wrapper {
 		document.addEventListener("DOMContentLoaded", function (event) {
 			const url = new URL(location.href);
 			const accessType = url.searchParams.get('type');
-			const preload = url.searchParams.get('path');
+			const preload = {
+				type: decodeURIComponent(url.searchParams.get('type') || ''),
+				path: decodeURIComponent(url.searchParams.get('path') || ''),
+				user: decodeURIComponent(url.searchParams.get('user') || ''),
+			}
 			if (!accessType) return;
 			document.getElementById('twits-selector').style.display = "none";
-			new TwitsLoader(accessType, preload && decodeURIComponent(preload));
+			new TwitsLoader(accessType, preload);
 		}, false);
 	} else if (location.protocol === "blob:") {
 		const sessionStr = sessionStorage.getItem(SESSION_KEY);
