@@ -465,7 +465,7 @@ namespace wrapper {
 			this.currentRev = sessiondata.metadata.rev;
 			this.status = new StatusHandler(sessiondata.profilepic);
 			this.originalPath = sessiondata.path;
-			window.originalHTML = original;
+			// window.originalHTML = original;
 			this.metadata = sessiondata.metadata
 			this.client = new Dropbox({
 				clientId: this.getKey(),
@@ -556,9 +556,6 @@ namespace wrapper {
 	} else if (location.protocol === "blob:") {
 		const sessionStr = sessionStorage.getItem(SESSION_KEY);
 		sessionStorage.setItem(SESSION_KEY, '');
-		const originalHTML = sessionStorage.getItem(ORIGINAL_KEY);
-		sessionStorage.setItem(ORIGINAL_KEY, '');
-		debugger;
 		document.addEventListener("DOMContentLoaded", function (event) {
 			if (!sessionStr) return alert('The session could not be loaded');
 			const sessiondata = JSON.parse(sessionStr);

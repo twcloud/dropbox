@@ -354,7 +354,7 @@ var wrapper;
             this.currentRev = sessiondata.metadata.rev;
             this.status = new StatusHandler(sessiondata.profilepic);
             this.originalPath = sessiondata.path;
-            window.originalHTML = original;
+            // window.originalHTML = original;
             this.metadata = sessiondata.metadata;
             this.client = new Dropbox({
                 clientId: this.getKey(),
@@ -456,14 +456,11 @@ var wrapper;
     else if (location.protocol === "blob:") {
         var sessionStr_1 = sessionStorage.getItem(SESSION_KEY);
         sessionStorage.setItem(SESSION_KEY, '');
-        var originalHTML_1 = sessionStorage.getItem(ORIGINAL_KEY);
-        sessionStorage.setItem(ORIGINAL_KEY, '');
-        debugger;
         document.addEventListener("DOMContentLoaded", function (event) {
             if (!sessionStr_1)
                 return alert('The session could not be loaded');
             var sessiondata = JSON.parse(sessionStr_1);
-            new SaverHandler(sessiondata, originalHTML_1);
+            new SaverHandler(sessiondata, originalHTML);
         }, false);
     }
 })(wrapper || (wrapper = {}));
