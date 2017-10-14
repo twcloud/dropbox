@@ -348,7 +348,7 @@ var wrapper;
         return StatusHandler;
     }());
     var SaverHandler = /** @class */ (function () {
-        function SaverHandler(sessiondata, original) {
+        function SaverHandler(sessiondata) {
             this.token = sessiondata.token;
             this.type = sessiondata.type;
             this.currentRev = sessiondata.metadata.rev;
@@ -460,7 +460,7 @@ var wrapper;
             if (!sessionStr_1)
                 return alert('The session could not be loaded');
             var sessiondata = JSON.parse(sessionStr_1);
-            new SaverHandler(sessiondata, originalHTML);
+            new SaverHandler(sessiondata);
         }, false);
     }
 })(wrapper || (wrapper = {}));

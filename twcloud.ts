@@ -459,7 +459,7 @@ namespace wrapper {
 			return (this.type === "full" ? this.apiKeyFull : (this.type === "apps" ? this.apiKeyApps : ""))
 		}
 
-		constructor(sessiondata: SessionData, original: string) {
+		constructor(sessiondata: SessionData) {
 			this.token = sessiondata.token;
 			this.type = sessiondata.type as any;
 			this.currentRev = sessiondata.metadata.rev;
@@ -559,7 +559,7 @@ namespace wrapper {
 		document.addEventListener("DOMContentLoaded", function (event) {
 			if (!sessionStr) return alert('The session could not be loaded');
 			const sessiondata = JSON.parse(sessionStr);
-			new SaverHandler(sessiondata, originalHTML);
+			new SaverHandler(sessiondata);
 		}, false);
 	}
 }
