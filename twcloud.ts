@@ -514,7 +514,7 @@ namespace wrapper {
 			// Attach the event handler to the message box
 			messageBox.addEventListener("tiddlyfox-save-file", (ev) => {
 				// Get the details from the message
-				var messageElement = event.target,
+				var messageElement = event.target as HTMLElement,
 					path = messageElement.getAttribute("data-tiddlyfox-path"),
 					content = messageElement.getAttribute("data-tiddlyfox-content"),
 					backupPath = messageElement.getAttribute("data-tiddlyfox-backup-path");
