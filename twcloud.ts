@@ -18,6 +18,7 @@ namespace wrapper {
 	const SESSION_KEY = 'twcloud-dropbox-session';
 	const ORIGINAL_KEY = 'twcloud-dropbox-original';
 	const SCRIPT_KEY = 'twcloud-dropbox-script';
+	const PRELOAD_KEY = 'twcloud-dropbox-preload';
 	const SCRIPT_CACHE = "201710131";
 	//PARANOIA: Delete the window property of these libraries to prevent 
 	//Javascript in the page from messing with them. We don't need to do
@@ -36,7 +37,8 @@ namespace wrapper {
 		text: string,
 		blob: Blob,
 		metadata: DropboxTypes.files.FileMetadata,
-		path: string
+		path: string,
+		hash: string
 	}
 
 	interface SessionData {
@@ -79,7 +81,7 @@ namespace wrapper {
 		}
 		constructor(
 			public type: string,
-			preload: {[K in "type" | "path" | "user"]: string}
+			preload: {[K in "type" | "path" | "user" | "hash"]: string}
 		) {
 			if (type !== "apps" && type !== "full") throw "type must be either apps or full"
 			this.client = new Dropbox({
@@ -89,38 +91,39 @@ namespace wrapper {
 			// Authenticate against Dropbox
 			this.status.setStatusMessage("Authenticating with Dropbox...");
 
-			if (document.location.hash) {
-				const data = document.location.hash.slice(1);
-				data.split('&').map(e => e.split('=').map(f => decodeURIComponent(f))).forEach(e => {
-					this.token[e[0]] = e[1];
-				})
-				//keep the hash on localhost for development purposes
-				//it will be removed later when the wiki is loaded
-				if (location.origin !== "http://localhost") location.hash = "";
+			//the hash could be either a permalink, or the response from dropbox oauth
+			if (preload.hash && preload.hash !== "#") {
+				const data = preload.hash.slice(1).split('&').map(e => e.split('=').map(f => decodeURIComponent(f)))
+				if (data.find(e => Array.isArray(e) && (e[0] === "access_token"))) {
+					data.forEach(e => {
+						this.token[e[0]] = e[1];
+					});
+					preload.hash = "";
+				}
 			}
 
 			if (!this.token.access_token) {
-				if (preload.path) sessionStorage.setItem('twcloud-dropbox-path', JSON.stringify(preload));
-				else sessionStorage.setItem('twcloud-dropbox-path', '');
+				if (preload.path) sessionStorage.setItem(PRELOAD_KEY, JSON.stringify(preload));
+				else sessionStorage.setItem(PRELOAD_KEY, '');
 				location.href = this.client.getAuthenticationUrl(location.origin + location.pathname + "?type=" + type);
 				return;
 			}
 
-			if (!preload.path && !preload.user) preload = tryParseJSON(sessionStorage.getItem('twcloud-dropbox-path')) || { type };
+			if (!preload.path && !preload.user) preload = tryParseJSON(sessionStorage.getItem(PRELOAD_KEY)) || { type };
 			this.client.setAccessToken(this.token.access_token);
-			sessionStorage.setItem('twcloud-dropbox-path', '');
+			sessionStorage.setItem(PRELOAD_KEY, '');
 			this.initApp(preload);
 		}
 
 		// Main application
-		initApp(preload: {[K in "type" | "path" | "user"]: string}) {
+		initApp(preload: {[K in "type" | "path" | "user" | "hash"]: string}) {
 			this.status.clearStatusMessage();
 			this.client.usersGetCurrentAccount(undefined).then(res => {
 				this.user = res;
 				if (preload.user
 					&& (this.user.account_id !== preload.user
-					|| this.token.account_id !== preload.user
-					|| this.type !== preload.type)
+						|| this.token.account_id !== preload.user
+						|| this.type !== preload.type)
 				) {
 					//allow the user to specify a link that is tied to a dropbox account
 					//also all permalinks specify the dropbox account id
@@ -140,7 +143,7 @@ namespace wrapper {
 				textdata.classList.add(this.user.team ? "profile-name-team" : "profile-name");
 				profile.appendChild(textdata);
 				profile.classList.remove("startup");
-				if (preload.path) this.openFile(preload.path);
+				if (preload.path) this.openFile(preload.path, preload.hash);
 				else this.readFolder("", document.getElementById("twits-files"));
 			})
 		};
@@ -250,7 +253,7 @@ namespace wrapper {
 		onClickFolderEntry() {
 			const self = this;
 			return function (this: HTMLAnchorElement, event: MouseEvent) {
-				if(event.altKey || event.ctrlKey || event.shiftKey) return true;
+				if (event.altKey || event.ctrlKey || event.shiftKey) return true;
 				var path = this.getAttribute("data-twits-path"),
 					classes = this.className.split(" ");
 				if (classes.indexOf("twits-folder") !== -1 && classes.indexOf("twits-folder-open") === -1) {
@@ -266,7 +269,7 @@ namespace wrapper {
 			}
 		};
 
-		openFile(path) {
+		openFile(path, hash?) {
 			// Read the TiddlyWiki file
 			// We can't trust Dropbox to have detected that the file is UTF8, 
 			// so we load it in binary and manually decode it
@@ -277,8 +280,8 @@ namespace wrapper {
 				//debugger;
 
 				return new Promise<DropboxTiddlyWiki>(resolve => {
-					const data: Blob = res.fileBlob;
-					delete res.fileBlob;
+					const data: Blob = (res as any).fileBlob;
+					delete (res as any).fileBlob;
 					console.log(data.type);
 					var reader = new FileReader();
 					reader.addEventListener("loadend", () => {
@@ -287,7 +290,7 @@ namespace wrapper {
 						// however I think this is converting from UTF8 to UTF16  -Arlen ]
 						const byteData = new Uint8Array(reader.result);
 						const unicode = this.manualConvertUTF8ToUnicode(byteData);
-						resolve({ text: unicode, blob: data, metadata: res, path });
+						resolve({ text: unicode, blob: data, metadata: res, path, hash });
 					});
 					reader.readAsArrayBuffer(data);
 					//debugger;
@@ -395,9 +398,7 @@ namespace wrapper {
 				sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
 				sessionStorage.setItem(ORIGINAL_KEY, data.text);
 				sessionStorage.setItem(SCRIPT_KEY, scriptparts.join('\n'));
-				location.href = url;
-
-
+				location.href = url + data.hash;
 			})
 		}
 
@@ -571,6 +572,9 @@ namespace wrapper {
 	}
 	// only load if we are on http or https, otherwise we are probably in a blob
 	if (location.protocol.indexOf('http') === 0) {
+		//save and clear the hash to prevent Google Analytics from seeing it
+		const locationHash = location.hash;
+		location.hash = "";
 		document.addEventListener("DOMContentLoaded", function (event) {
 			const url = new URL(location.href);
 			const accessType = url.searchParams.get('type');
@@ -578,6 +582,7 @@ namespace wrapper {
 				type: decodeURIComponent(url.searchParams.get('type') || ''),
 				path: decodeURIComponent(url.searchParams.get('path') || ''),
 				user: decodeURIComponent(url.searchParams.get('user') || ''),
+				hash: locationHash
 			}
 			if (!accessType) return;
 			document.getElementById('twits-selector').style.display = "none";

@@ -5,6 +5,7 @@ var wrapper;
     var SESSION_KEY = 'twcloud-dropbox-session';
     var ORIGINAL_KEY = 'twcloud-dropbox-original';
     var SCRIPT_KEY = 'twcloud-dropbox-script';
+    var PRELOAD_KEY = 'twcloud-dropbox-preload';
     var SCRIPT_CACHE = "201710131";
     function tryParseJSON(str) {
         try {
@@ -29,28 +30,28 @@ var wrapper;
             this.status = new StatusHandler("");
             // Authenticate against Dropbox
             this.status.setStatusMessage("Authenticating with Dropbox...");
-            if (document.location.hash) {
-                var data = document.location.hash.slice(1);
-                data.split('&').map(function (e) { return e.split('=').map(function (f) { return decodeURIComponent(f); }); }).forEach(function (e) {
-                    _this.token[e[0]] = e[1];
-                });
-                //keep the hash on localhost for development purposes
-                //it will be removed later when the wiki is loaded
-                if (location.origin !== "http://localhost")
-                    location.hash = "";
+            //the hash could be either a permalink, or the response from dropbox oauth
+            if (preload.hash && preload.hash !== "#") {
+                var data = preload.hash.slice(1).split('&').map(function (e) { return e.split('=').map(function (f) { return decodeURIComponent(f); }); });
+                if (data.find(function (e) { return Array.isArray(e) && (e[0] === "access_token"); })) {
+                    data.forEach(function (e) {
+                        _this.token[e[0]] = e[1];
+                    });
+                    preload.hash = "";
+                }
             }
             if (!this.token.access_token) {
                 if (preload.path)
-                    sessionStorage.setItem('twcloud-dropbox-path', JSON.stringify(preload));
+                    sessionStorage.setItem(PRELOAD_KEY, JSON.stringify(preload));
                 else
-                    sessionStorage.setItem('twcloud-dropbox-path', '');
+                    sessionStorage.setItem(PRELOAD_KEY, '');
                 location.href = this.client.getAuthenticationUrl(location.origin + location.pathname + "?type=" + type);
                 return;
             }
             if (!preload.path && !preload.user)
-                preload = tryParseJSON(sessionStorage.getItem('twcloud-dropbox-path')) || { type: type };
+                preload = tryParseJSON(sessionStorage.getItem(PRELOAD_KEY)) || { type: type };
             this.client.setAccessToken(this.token.access_token);
-            sessionStorage.setItem('twcloud-dropbox-path', '');
+            sessionStorage.setItem(PRELOAD_KEY, '');
             this.initApp(preload);
         }
         TwitsLoader.prototype.getKey = function () {
@@ -85,7 +86,7 @@ var wrapper;
                 profile.appendChild(textdata);
                 profile.classList.remove("startup");
                 if (preload.path)
-                    _this.openFile(preload.path);
+                    _this.openFile(preload.path, preload.hash);
                 else
                     _this.readFolder("", document.getElementById("twits-files"));
             });
@@ -207,7 +208,7 @@ var wrapper;
             };
         };
         ;
-        TwitsLoader.prototype.openFile = function (path) {
+        TwitsLoader.prototype.openFile = function (path, hash) {
             var _this = this;
             // Read the TiddlyWiki file
             // We can't trust Dropbox to have detected that the file is UTF8, 
@@ -228,7 +229,7 @@ var wrapper;
                         // however I think this is converting from UTF8 to UTF16  -Arlen ]
                         var byteData = new Uint8Array(reader.result);
                         var unicode = _this.manualConvertUTF8ToUnicode(byteData);
-                        resolve({ text: unicode, blob: data, metadata: res, path: path });
+                        resolve({ text: unicode, blob: data, metadata: res, path: path, hash: hash });
                     });
                     reader.readAsArrayBuffer(data);
                     //debugger;
@@ -313,7 +314,7 @@ var wrapper;
                 sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
                 sessionStorage.setItem(ORIGINAL_KEY, data.text);
                 sessionStorage.setItem(SCRIPT_KEY, scriptparts.join('\n'));
-                location.href = url;
+                location.href = url + data.hash;
             });
         };
         TwitsLoader.prototype.loadTiddlywiki = function (data) {
@@ -465,6 +466,9 @@ var wrapper;
     }());
     // only load if we are on http or https, otherwise we are probably in a blob
     if (location.protocol.indexOf('http') === 0) {
+        //save and clear the hash to prevent Google Analytics from seeing it
+        var locationHash_1 = location.hash;
+        location.hash = "";
         document.addEventListener("DOMContentLoaded", function (event) {
             var url = new URL(location.href);
             var accessType = url.searchParams.get('type');
@@ -472,6 +476,7 @@ var wrapper;
                 type: decodeURIComponent(url.searchParams.get('type') || ''),
                 path: decodeURIComponent(url.searchParams.get('path') || ''),
                 user: decodeURIComponent(url.searchParams.get('user') || ''),
+                hash: locationHash_1
             };
             if (!accessType)
                 return;
