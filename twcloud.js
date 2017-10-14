@@ -5,7 +5,7 @@ var wrapper;
     var SESSION_KEY = 'twcloud-dropbox-session';
     var ORIGINAL_KEY = 'twcloud-dropbox-original';
     var SCRIPT_KEY = 'twcloud-dropbox-script';
-    var SCRIPT_CACHE = "201710052";
+    var SCRIPT_CACHE = "201710131";
     function tryParseJSON(str) {
         try {
             return JSON.parse(str);
@@ -191,6 +191,8 @@ var wrapper;
         TwitsLoader.prototype.onClickFolderEntry = function () {
             var self = this;
             return function (event) {
+                if (event.altKey || event.ctrlKey || event.shiftKey)
+                    return true;
                 var path = this.getAttribute("data-twits-path"), classes = this.className.split(" ");
                 if (classes.indexOf("twits-folder") !== -1 && classes.indexOf("twits-folder-open") === -1) {
                     classes.push("twits-folder-open");

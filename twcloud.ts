@@ -18,7 +18,7 @@ namespace wrapper {
 	const SESSION_KEY = 'twcloud-dropbox-session';
 	const ORIGINAL_KEY = 'twcloud-dropbox-original';
 	const SCRIPT_KEY = 'twcloud-dropbox-script';
-	const SCRIPT_CACHE = "201710052";
+	const SCRIPT_CACHE = "201710131";
 	//PARANOIA: Delete the window property of these libraries to prevent 
 	//Javascript in the page from messing with them. We don't need to do
 	//this in the blob saver because nothing is loaded into the original
@@ -249,7 +249,8 @@ namespace wrapper {
 
 		onClickFolderEntry() {
 			const self = this;
-			return function (this: HTMLAnchorElement, event) {
+			return function (this: HTMLAnchorElement, event: MouseEvent) {
+				if(event.altKey || event.ctrlKey || event.shiftKey) return true;
 				var path = this.getAttribute("data-twits-path"),
 					classes = this.className.split(" ");
 				if (classes.indexOf("twits-folder") !== -1 && classes.indexOf("twits-folder-open") === -1) {
