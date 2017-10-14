@@ -458,6 +458,7 @@ var wrapper;
         sessionStorage.setItem(SESSION_KEY, '');
         var originalHTML_1 = sessionStorage.getItem(ORIGINAL_KEY);
         sessionStorage.setItem(ORIGINAL_KEY, '');
+        debugger;
         document.addEventListener("DOMContentLoaded", function (event) {
             if (!sessionStr_1)
                 return alert('The session could not be loaded');

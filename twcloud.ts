@@ -558,6 +558,7 @@ namespace wrapper {
 		sessionStorage.setItem(SESSION_KEY, '');
 		const originalHTML = sessionStorage.getItem(ORIGINAL_KEY);
 		sessionStorage.setItem(ORIGINAL_KEY, '');
+		debugger;
 		document.addEventListener("DOMContentLoaded", function (event) {
 			if (!sessionStr) return alert('The session could not be loaded');
 			const sessiondata = JSON.parse(sessionStr);
