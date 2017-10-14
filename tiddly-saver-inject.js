@@ -7,7 +7,13 @@ Child: save-file-tiddly-saver
     Parent: file-saved-tiddly-saver
 	
 */
-window.tweakConfig = () => {
+(function () {
+
+const ORIGINAL_KEY = 'twcloud-dropbox-original';
+const originalHTML = sessionStorage.getItem(ORIGINAL_KEY);
+sessionStorage.setItem(ORIGINAL_KEY, '');
+
+window.tweakConfig = function() {
 	config.options.chkHttpReadOnly = false;
 }
 
@@ -43,9 +49,14 @@ window.addEventListener('load', function () {
 	window.mozillaLoadFile = injectedLoadFile;
 	window.convertUriToUTF8 = injectedConvertUriToUTF8;
 	window.convertUnicodeToFileFormat = injectedConvertUnicodeToFileFormat;
-	window.getLocalPath = (url) => {
+
+	window.getLocalPath = function (url) {
 		return url;
 	}
+
+	window.recreateOriginal = function() { return originalHTML }
+
+	window.originalHTML = originalHTML;
 
 	//End TiddlyFox inject.js ========================================================
 
@@ -57,7 +68,6 @@ window.addEventListener('load', function () {
 	var saver = function (text, method, callback, options) {
 		var messageBox = document.getElementById("tiddlyfox-message-box");
 		if (messageBox) {
-
 			// Create the message element and put it in the message box
 			var message = document.createElement("div");
 			message.setAttribute("data-tiddlyfox-path", document.location.toString());
@@ -96,12 +106,8 @@ window.addEventListener('load', function () {
 	}
 	if (typeof ($tw) !== "undefined" && $tw)
 		addSaver();
-
 	if (version.title === "TiddlyWiki" && version.major === 2) {
 		isTWC = true;
 	}
-
-	// console.log("send-welcome-tiddly-chrome-file-saver");
-
 });
-
+})();
