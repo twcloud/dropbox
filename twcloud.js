@@ -315,7 +315,7 @@ var wrapper;
                 sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
                 sessionStorage.setItem(ORIGINAL_KEY, data.text);
                 sessionStorage.setItem(SCRIPT_KEY, scriptparts.join('\n'));
-                location.href = url + data.hash;
+                location.href = url + (typeof data.hash === "string" ? data.hash : '');
             });
         };
         TwitsLoader.prototype.loadTiddlywiki = function (data) {
