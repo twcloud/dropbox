@@ -6,12 +6,12 @@ interface Window {
 	//jQuery: any;
 	//$: any;
 	$tw: any;
+	gtag: Function
 	// Rx: typeof Rx;
 }
-declare const isInBlob: boolean;
-declare const blobData: {
 
-}
+declare const { gtag }: Window;
+
 // type rxjs = typeof Rx;
 type Hashmap<T> = { [K: string]: T };
 namespace wrapper {
@@ -19,7 +19,7 @@ namespace wrapper {
 	const ORIGINAL_KEY = 'twcloud-dropbox-original';
 	const SCRIPT_KEY = 'twcloud-dropbox-script';
 	const PRELOAD_KEY = 'twcloud-dropbox-preload';
-	const SCRIPT_CACHE = "201710141";
+	const SCRIPT_CACHE = "201710181";
 	//PARANOIA: Delete the window property of these libraries to prevent 
 	//Javascript in the page from messing with them. We don't need to do
 	//this in the blob saver because nothing is loaded into the original
@@ -93,7 +93,8 @@ namespace wrapper {
 
 			//the hash could be either a permalink, or the response from dropbox oauth
 			if (preload.hash && preload.hash !== "#") {
-				const data = preload.hash.slice(1).split('&').map(e => e.split('=').map(f => decodeURIComponent(f)))
+				const data = (preload.hash[0] === "#" ? preload.hash.slice(1) : preload.hash)
+					.split('&').map(e => e.split('=').map(f => decodeURIComponent(f)))
 				if (data.find(e => Array.isArray(e) && (e[0] === "access_token"))) {
 					data.forEach(e => {
 						this.token[e[0]] = e[1];
@@ -144,7 +145,7 @@ namespace wrapper {
 				textdata.classList.add(this.user.team ? "profile-name-team" : "profile-name");
 				profile.appendChild(textdata);
 				profile.classList.remove("startup");
-				if (preload.path) this.openFile(preload.path, preload.hash);
+				if (preload.path) this.openFile(preload.path, preload.hash, true);
 				else this.readFolder("", document.getElementById("twits-files"));
 			})
 		};
@@ -270,11 +271,26 @@ namespace wrapper {
 			}
 		};
 
-		openFile(path, hash?) {
+		openFile(path, hash?, isPreload: boolean = false) {
 			// Read the TiddlyWiki file
 			// We can't trust Dropbox to have detected that the file is UTF8, 
 			// so we load it in binary and manually decode it
 			this.status.setStatusMessage("Reading HTML file...");
+			let data;
+			const load = (d?) => {
+				console.log(d, data);
+				//if triggered and payload we go
+				if (data === true && d) this.loadTiddlywiki(d);
+				//if this is a trigger, but not loaded, set data to triggered
+				else if (!d && !data) data = true;
+				//if this is payload then prepare for trigger
+				else if (d) data = d;
+				//we are loaded and triggered
+				else this.loadTiddlywiki(data);
+			}
+			// gtag('event', 'loadtw', isPreload ? 'preload' : 'selector', () => { load(); });
+			// setTimeout(() => { load() }, 5000);
+			load();
 			this.client.filesDownload({
 				path: path
 			}).then(res => {
@@ -297,7 +313,7 @@ namespace wrapper {
 					//debugger;
 				})
 			}).then((data) => {
-				this.loadTiddlywiki(data)
+				load(data);
 			})
 
 		}
@@ -576,6 +592,7 @@ namespace wrapper {
 		//save and clear the hash to prevent Google Analytics from seeing it
 		const locationHash = location.hash;
 		location.hash = "";
+
 		document.addEventListener("DOMContentLoaded", function (event) {
 			const url = new URL(location.href);
 			const accessType = url.searchParams.get('type');

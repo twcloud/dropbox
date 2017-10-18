@@ -6,7 +6,7 @@ var wrapper;
     var ORIGINAL_KEY = 'twcloud-dropbox-original';
     var SCRIPT_KEY = 'twcloud-dropbox-script';
     var PRELOAD_KEY = 'twcloud-dropbox-preload';
-    var SCRIPT_CACHE = "201710141";
+    var SCRIPT_CACHE = "201710181";
     function tryParseJSON(str) {
         try {
             return JSON.parse(str);
@@ -32,7 +32,8 @@ var wrapper;
             this.status.setStatusMessage("Authenticating with Dropbox...");
             //the hash could be either a permalink, or the response from dropbox oauth
             if (preload.hash && preload.hash !== "#") {
-                var data = preload.hash.slice(1).split('&').map(function (e) { return e.split('=').map(function (f) { return decodeURIComponent(f); }); });
+                var data = (preload.hash[0] === "#" ? preload.hash.slice(1) : preload.hash)
+                    .split('&').map(function (e) { return e.split('=').map(function (f) { return decodeURIComponent(f); }); });
                 if (data.find(function (e) { return Array.isArray(e) && (e[0] === "access_token"); })) {
                     data.forEach(function (e) {
                         _this.token[e[0]] = e[1];
@@ -87,7 +88,7 @@ var wrapper;
                 profile.appendChild(textdata);
                 profile.classList.remove("startup");
                 if (preload.path)
-                    _this.openFile(preload.path, preload.hash);
+                    _this.openFile(preload.path, preload.hash, true);
                 else
                     _this.readFolder("", document.getElementById("twits-files"));
             });
@@ -209,12 +210,29 @@ var wrapper;
             };
         };
         ;
-        TwitsLoader.prototype.openFile = function (path, hash) {
+        TwitsLoader.prototype.openFile = function (path, hash, isPreload) {
             var _this = this;
+            if (isPreload === void 0) { isPreload = false; }
             // Read the TiddlyWiki file
             // We can't trust Dropbox to have detected that the file is UTF8, 
             // so we load it in binary and manually decode it
             this.status.setStatusMessage("Reading HTML file...");
+            var data;
+            var load = function (d) {
+                console.log(d, data);
+                //if triggered and payload we go
+                if (data === true && d)
+                    _this.loadTiddlywiki(d);
+                else if (!d && !data)
+                    data = true;
+                else if (d)
+                    data = d;
+                else
+                    _this.loadTiddlywiki(data);
+            };
+            // gtag('event', 'loadtw', isPreload ? 'preload' : 'selector', () => { load(); });
+            // setTimeout(() => { load() }, 5000);
+            load();
             this.client.filesDownload({
                 path: path
             }).then(function (res) {
@@ -236,7 +254,7 @@ var wrapper;
                     //debugger;
                 });
             }).then(function (data) {
-                _this.loadTiddlywiki(data);
+                load(data);
             });
         };
         TwitsLoader.prototype.manualConvertUTF8ToUnicode = function (utf) {
