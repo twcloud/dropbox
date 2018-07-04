@@ -22,6 +22,7 @@ var wrapper;
             this.apiKeyFull = "gy3j4gsa191p31x";
             this.apiKeyApps = "tu8jc7jsdeg55ta";
             this.token = {};
+            this.method = "iframe";
             if (type !== "apps" && type !== "full")
                 throw "type must be either apps or full";
             this.client = new Dropbox({
@@ -30,6 +31,7 @@ var wrapper;
             this.status = new StatusHandler("");
             // Authenticate against Dropbox
             this.status.setStatusMessage("Authenticating with Dropbox...");
+            this.method = preload.method;
             //the hash could be either a permalink, or the response from dropbox oauth
             if (preload.hash && preload.hash !== "#") {
                 var data = (preload.hash[0] === "#" ? preload.hash.slice(1) : preload.hash)
@@ -336,12 +338,57 @@ var wrapper;
                 location.href = url + (typeof data.hash === "string" ? data.hash : '');
             });
         };
+        TwitsLoader.prototype.buildIFrame = function (data) {
+            var _this = this;
+            // this.requestScript('tiddly-saver-inject.js?' + SCRIPT_CACHE, "text").then(res => {
+            document.body.innerHTML = "<iframe id=\"twits-iframe\" ></iframe>";
+            this.iframe = document.getElementById('twits-iframe');
+            this.iframe.src = URL.createObjectURL(new Blob([data.blob], { type: "text/html" }), { oneTimeOnly: false });
+            var session = {
+                token: this.token,
+                type: this.type,
+                path: data.path,
+                metadata: data.metadata,
+                profilepic: this.user.profile_photo_url
+            };
+            this.iframe.addEventListener("load", function (ev) {
+                new SaverHandler(session, _this.iframe.contentDocument);
+            });
+        };
+        TwitsLoader.prototype.replacePage = function (data) {
+            var css = document.getElementById('twits-saver-styles').innerHTML;
+            document.documentElement.innerHTML = data.text;
+            var style = document.createElement('style');
+            style.id = "twits-saver-styles";
+            style.type = "text/css";
+            style.innerHTML = css;
+            document.head.appendChild(style);
+            var scrs = Array.prototype.slice.apply(document.getElementsByTagName('script'));
+            scrs.forEach(function (e) {
+                var scr = document.createElement('script');
+                scr.innerHTML = e.innerHTML;
+                e.parentElement.insertBefore(scr, e);
+                scr.remove();
+            });
+            // document.head.innerHTML = doc.children[0].innerHTML;
+            // document.body.className = doc.children[1].className;
+            // document.body.innerHTML = doc.children[1].innerHTML;
+            new SaverHandler({
+                token: this.token,
+                type: this.type,
+                path: data.path,
+                metadata: data.metadata,
+                profilepic: this.user.profile_photo_url
+            }, document);
+            window.originalHTML = data.text;
+        };
         TwitsLoader.prototype.loadTiddlywiki = function (data) {
             var self = this;
-            this.buildNewBlob(data);
-            //allow-same-origin 
-            // document.body.innerHTML = `<iframe id="twits-iframe" sandbox="allow-same-origin allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-scripts"></iframe>`;
-            // this.iframe = document.getElementById('twits-iframe') as HTMLIFrameElement;
+            switch (this.method) {
+                case "iframe": this.buildIFrame(data);
+                case "blob": this.buildNewBlob(data);
+                case "replace": this.replacePage(data);
+            }
             return true;
         };
         return TwitsLoader;
@@ -390,7 +437,8 @@ var wrapper;
         return StatusHandler;
     }());
     var SaverHandler = /** @class */ (function () {
-        function SaverHandler(sessiondata) {
+        function SaverHandler(sessiondata, document) {
+            this.document = document;
             this.token = sessiondata.token;
             this.type = sessiondata.type;
             this.currentRev = sessiondata.metadata.rev;
@@ -420,20 +468,28 @@ var wrapper;
         SaverHandler.prototype.setupSaving = function () {
             var _this = this;
             console.log('inserting message box');
-            var messageBox = document.getElementById("tiddlyfox-message-box");
+            var messageBox = this.document.getElementById("tiddlyfox-message-box");
             if (!messageBox) {
-                messageBox = document.createElement("div");
+                messageBox = this.document.createElement("div");
                 messageBox.id = "tiddlyfox-message-box";
                 messageBox.style.display = "none";
-                document.body.appendChild(messageBox);
+                this.document.body.appendChild(messageBox);
             }
             // Attach the event handler to the message box
-            messageBox.addEventListener("tiddlyfox-save-file", function (ev) {
+            messageBox.addEventListener("tiddlyfox-save-file", function (event) {
                 // Get the details from the message
                 var messageElement = event.target, path = messageElement.getAttribute("data-tiddlyfox-path"), content = messageElement.getAttribute("data-tiddlyfox-content"), backupPath = messageElement.getAttribute("data-tiddlyfox-backup-path");
                 // messageId = "tiddlywiki-save-file-response-" + this.idGenerator++;
-                if (path !== document.location.toString())
-                    return;
+                // Don't worry about any of this since only TWC has a problem with misusing the path, 
+                // and that needs to be prevented in the TWC shim that implements the TiddlyFox adapter
+                // // fix the path since the TiddlyWiki is inside a blob
+                // if (path.slice(0, 2) === "\\\\") {
+                // 	if (this.document.location.toString().slice(0, 5) === "blob:") {
+                // 		path = "blob:ht" + path.slice(2);
+                // 	}
+                // 	path = path.replace(/\\/gi, "/");
+                // }
+                // if (path !== this.document.location.toString()) return;
                 _this.saveTiddlyWiki(content, function (err) {
                     // Send a confirmation message
                     var event = document.createEvent("Events");
@@ -495,7 +551,8 @@ var wrapper;
                 type: decodeURIComponent(url.searchParams.get('type') || ''),
                 path: decodeURIComponent(url.searchParams.get('path') || ''),
                 user: decodeURIComponent(url.searchParams.get('user') || ''),
-                hash: locationHash_1 || ''
+                hash: locationHash_1 || '',
+                method: decodeURIComponent(url.searchParams.get('method') || "blob")
             };
             if (!accessType)
                 return;
@@ -510,7 +567,7 @@ var wrapper;
             if (!sessionStr_1)
                 return alert('The session could not be loaded');
             var sessiondata = JSON.parse(sessionStr_1);
-            new SaverHandler(sessiondata);
+            new SaverHandler(sessiondata, document);
         }, false);
     }
 })(wrapper || (wrapper = {}));

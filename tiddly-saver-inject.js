@@ -16,9 +16,11 @@ Child: save-file-tiddly-saver
 	window.tweakConfig = function () {
 		config.options.chkHttpReadOnly = false;
 	}
+	if(window.$tw) onload();
+	else window.addEventListener('load', onload);
 
-	window.addEventListener('load', function () {
-
+	function onload() {
+		console.log('tiddly-saver-inject');
 		//set tiddlywiki classic to readonly
 		// if(typeof config !== "undefined" && config && config.options) config.options.chkHttpReadOnly = false;
 		var injectedSaveFile = function (path, content) {
@@ -109,5 +111,5 @@ Child: save-file-tiddly-saver
 		if (version.title === "TiddlyWiki" && version.major === 2) {
 			isTWC = true;
 		}
-	});
+	}
 })();

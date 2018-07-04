@@ -81,7 +81,7 @@ namespace wrapper {
 		}
 		constructor(
 			public type: string,
-			preload: {[K in "type" | "path" | "user" | "hash"]: string}
+			preload: {[K in "type" | "path" | "user" | "hash" | "method"]: string}
 		) {
 			if (type !== "apps" && type !== "full") throw "type must be either apps or full"
 			this.client = new Dropbox({
@@ -90,7 +90,7 @@ namespace wrapper {
 			this.status = new StatusHandler("");
 			// Authenticate against Dropbox
 			this.status.setStatusMessage("Authenticating with Dropbox...");
-
+			this.method = preload.method;
 			//the hash could be either a permalink, or the response from dropbox oauth
 			if (preload.hash && preload.hash !== "#") {
 				const data = (preload.hash[0] === "#" ? preload.hash.slice(1) : preload.hash)
@@ -418,16 +418,61 @@ namespace wrapper {
 				location.href = url + (typeof data.hash === "string" ? data.hash : '');
 			})
 		}
-
+		buildIFrame(data: DropboxTiddlyWiki) {
+			// this.requestScript('tiddly-saver-inject.js?' + SCRIPT_CACHE, "text").then(res => {
+			document.body.innerHTML = `<iframe id="twits-iframe" ></iframe>`;
+			this.iframe = document.getElementById('twits-iframe') as HTMLIFrameElement;
+			this.iframe.src = URL.createObjectURL(new Blob([data.blob], { type: "text/html" }), { oneTimeOnly: false });
+			const session: SessionData = {
+				token: this.token,
+				type: this.type,
+				path: data.path,
+				metadata: data.metadata,
+				profilepic: this.user.profile_photo_url
+			};
+			this.iframe.addEventListener("load", (ev) => {
+				new SaverHandler(session, this.iframe.contentDocument);
+			});
+		}
+		replacePage(data: DropboxTiddlyWiki) {
+			
+			const css = document.getElementById('twits-saver-styles').innerHTML
+			document.documentElement.innerHTML = data.text;
+			var style = document.createElement('style');
+			style.id = "twits-saver-styles";
+			style.type = "text/css";
+			style.innerHTML = css;
+			document.head.appendChild(style);
+			var scrs: HTMLScriptElement[] = Array.prototype.slice.apply(document.getElementsByTagName('script'));
+			scrs.forEach(e => {
+				var scr = document.createElement('script');
+				scr.innerHTML = e.innerHTML;
+				e.parentElement.insertBefore(scr, e);
+				scr.remove();
+			})
+			// document.head.innerHTML = doc.children[0].innerHTML;
+			// document.body.className = doc.children[1].className;
+			// document.body.innerHTML = doc.children[1].innerHTML;
+			new SaverHandler({
+				token: this.token,
+				type: this.type,
+				path: data.path,
+				metadata: data.metadata,
+				profilepic: this.user.profile_photo_url
+			}, document);
+			window.originalHTML = data.text;
+		}
+		method: string;
 		loadTiddlywiki(data: DropboxTiddlyWiki) {
+
 			const self = this;
-			this.buildNewBlob(data);
-			//allow-same-origin 
-			// document.body.innerHTML = `<iframe id="twits-iframe" sandbox="allow-same-origin allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-scripts"></iframe>`;
-			// this.iframe = document.getElementById('twits-iframe') as HTMLIFrameElement;
+			switch (this.method) {
+				case "iframe": this.buildIFrame(data);
+				case "blob": this.buildNewBlob(data);
+				case "replace": this.replacePage(data);
+			}
 			return true;
 		}
-
 
 
 	}
@@ -503,7 +548,7 @@ namespace wrapper {
 			return (this.type === "full" ? this.apiKeyFull : (this.type === "apps" ? this.apiKeyApps : ""))
 		}
 
-		constructor(sessiondata: SessionData) {
+		constructor(sessiondata: SessionData, public document: Document) {
 			this.token = sessiondata.token;
 			this.type = sessiondata.type as any;
 			this.currentRev = sessiondata.metadata.rev;
@@ -520,23 +565,32 @@ namespace wrapper {
 
 		setupSaving() {
 			console.log('inserting message box');
-			var messageBox = document.getElementById("tiddlyfox-message-box");
+			var messageBox = this.document.getElementById("tiddlyfox-message-box");
 			if (!messageBox) {
-				messageBox = document.createElement("div");
+				messageBox = this.document.createElement("div");
 				messageBox.id = "tiddlyfox-message-box";
 				messageBox.style.display = "none";
-				document.body.appendChild(messageBox);
+				this.document.body.appendChild(messageBox);
 			}
 			// Attach the event handler to the message box
-			messageBox.addEventListener("tiddlyfox-save-file", (ev) => {
+			messageBox.addEventListener("tiddlyfox-save-file", (event) => {
 				// Get the details from the message
 				var messageElement = event.target as HTMLElement,
 					path = messageElement.getAttribute("data-tiddlyfox-path"),
 					content = messageElement.getAttribute("data-tiddlyfox-content"),
 					backupPath = messageElement.getAttribute("data-tiddlyfox-backup-path");
 				// messageId = "tiddlywiki-save-file-response-" + this.idGenerator++;
+				// Don't worry about any of this since only TWC has a problem with misusing the path, 
+				// and that needs to be prevented in the TWC shim that implements the TiddlyFox adapter
+				// // fix the path since the TiddlyWiki is inside a blob
+				// if (path.slice(0, 2) === "\\\\") {
+				// 	if (this.document.location.toString().slice(0, 5) === "blob:") {
+				// 		path = "blob:ht" + path.slice(2);
+				// 	}
+				// 	path = path.replace(/\\/gi, "/");
+				// }
 
-				if (path !== document.location.toString()) return;
+				// if (path !== this.document.location.toString()) return;
 
 				this.saveTiddlyWiki(content, (err) => {
 					// Send a confirmation message
@@ -600,7 +654,8 @@ namespace wrapper {
 				type: decodeURIComponent(url.searchParams.get('type') || ''),
 				path: decodeURIComponent(url.searchParams.get('path') || ''),
 				user: decodeURIComponent(url.searchParams.get('user') || ''),
-				hash: locationHash || ''
+				hash: locationHash || '',
+				method: decodeURIComponent(url.searchParams.get('method') || "blob")
 			}
 			if (!accessType) return;
 			document.getElementById('twits-selector').style.display = "none";
@@ -612,7 +667,7 @@ namespace wrapper {
 		document.addEventListener("DOMContentLoaded", function (event) {
 			if (!sessionStr) return alert('The session could not be loaded');
 			const sessiondata = JSON.parse(sessionStr);
-			new SaverHandler(sessiondata);
+			new SaverHandler(sessiondata, document);
 		}, false);
 	}
 }
