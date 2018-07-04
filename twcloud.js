@@ -6,7 +6,7 @@ var wrapper;
     var ORIGINAL_KEY = 'twcloud-dropbox-original';
     var SCRIPT_KEY = 'twcloud-dropbox-script';
     var PRELOAD_KEY = 'twcloud-dropbox-preload';
-    var SCRIPT_CACHE = "201710181";
+    var SCRIPT_CACHE = "201807041";
     function tryParseJSON(str) {
         try {
             return JSON.parse(str);
@@ -22,7 +22,6 @@ var wrapper;
             this.apiKeyFull = "gy3j4gsa191p31x";
             this.apiKeyApps = "tu8jc7jsdeg55ta";
             this.token = {};
-            this.method = "iframe";
             if (type !== "apps" && type !== "full")
                 throw "type must be either apps or full";
             this.client = new Dropbox({

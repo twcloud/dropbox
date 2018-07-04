@@ -19,7 +19,7 @@ namespace wrapper {
 	const ORIGINAL_KEY = 'twcloud-dropbox-original';
 	const SCRIPT_KEY = 'twcloud-dropbox-script';
 	const PRELOAD_KEY = 'twcloud-dropbox-preload';
-	const SCRIPT_CACHE = "201710181";
+	const SCRIPT_CACHE = "201807041";
 	//PARANOIA: Delete the window property of these libraries to prevent 
 	//Javascript in the page from messing with them. We don't need to do
 	//this in the blob saver because nothing is loaded into the original
